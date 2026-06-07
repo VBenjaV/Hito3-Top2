@@ -1,0 +1,678 @@
+\documentclass[12pt,a4paper]{article}
+
+% ------------------------------------------------
+% PAQUETES
+% ------------------------------------------------
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+
+\usepackage{geometry}
+\geometry{
+  left=2.5cm,
+  right=2.5cm,
+  top=2.5cm,
+  bottom=2.5cm
+}
+
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{multirow}
+
+\tcbuselibrary{breakable, skins}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue
+}
+
+% Estilo de código
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8},
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red!70!black},
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=5pt
+}
+
+% Cajas informativas
+\newtcolorbox{infobox}[1][]{
+  colback=blue!5,
+  colframe=blue!40,
+  fonttitle=\bfseries,
+  title=#1,
+  breakable
+}
+
+\newtcolorbox{warningbox}[1][]{
+  colback=orange!8,
+  colframe=orange!60,
+  fonttitle=\bfseries,
+  title=#1,
+  breakable
+}
+
+% Encabezado y pie de página
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Ingeniería de Software}
+\lhead{Hito 3 --- SkyConnect Airlines}
+\rfoot{Página \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ------------------------------------------------
+% DATOS DEL DOCUMENTO
+% ------------------------------------------------
+
+\title{
+  \textbf{HITO 3}\\[0.4cm]
+  \large Optimización y Escalabilidad de una Plataforma\\
+  de Venta de Pasajes Aéreos bajo Alta Concurrencia
+}
+
+\author{Curso: Ingeniería de Software}
+\date{}
+
+% ================================================
+\begin{document}
+% ================================================
+
+\maketitle
+\thispagestyle{fancy}
+
+% ------------------------------------------------
+\section{Antecedentes}
+% ------------------------------------------------
+
+Durante eventos masivos de comercio electrónico como \textit{Cyber Day} o \textit{Black Friday}, las plataformas de venta de pasajes aéreos experimentan incrementos significativos en la cantidad de usuarios concurrentes. Esta situación genera desafíos importantes en rendimiento, disponibilidad y escalabilidad de los sistemas informáticos.
+
+La empresa ficticia \textbf{SkyConnect Airlines} ha detectado que su plataforma presenta tiempos de respuesta inaceptables cuando miles de usuarios intentan consultar vuelos simultáneamente, afectando la experiencia de compra y provocando pérdidas económicas directas.
+
+Cada equipo recibirá un \textbf{sistema base completamente funcional y dockerizado}. El trabajo consiste en analizar sus limitaciones bajo carga, identificar cuellos de botella y aplicar optimizaciones medibles, documentando cada decisión técnica y económica.
+
+% ------------------------------------------------
+\section{Objetivo General}
+% ------------------------------------------------
+
+Analizar, medir y optimizar el rendimiento de una plataforma de venta de pasajes aéreos bajo condiciones de alta concurrencia, justificando técnica y económicamente las mejoras implementadas.
+
+% ------------------------------------------------
+\section{Objetivos Específicos}
+% ------------------------------------------------
+
+Al finalizar la actividad los estudiantes serán capaces de:
+
+\begin{itemize}
+  \item Identificar y cuantificar cuellos de botella presentes en una arquitectura web real.
+  \item Implementar mecanismos de caché utilizando Redis con estrategias de invalidación adecuadas.
+  \item Aplicar herramientas de observabilidad (Prometheus y Grafana) para medir el impacto de las mejoras.
+  \item Diseñar y ejecutar pruebas de carga reproducibles con Locust.
+  \item Comparar métricas objetivas antes y después de cada optimización.
+  \item Justificar técnica y económicamente las decisiones de arquitectura adoptadas.
+\end{itemize}
+
+% ------------------------------------------------
+\section{Sistema Base Entregado}
+% ------------------------------------------------
+
+Cada equipo recibirá una aplicación completamente funcional y dockerizada. \textbf{No se requiere implementar funcionalidad nueva de negocio}: el trabajo se centra en medir, optimizar y documentar.
+
+\subsection{Stack tecnológico}
+
+\begin{itemize}
+  \item \textbf{Frontend:} React + Axios + Bootstrap
+  \item \textbf{Backend:} FastAPI (Python) + SQLAlchemy (ORM)
+  \item \textbf{Base de datos:} PostgreSQL
+  \item \textbf{Orquestación:} Docker Compose
+\end{itemize}
+
+\subsection{Estructura del proyecto}
+
+\begin{lstlisting}[language=bash, caption={Estructura de directorios del sistema base}]
+skyconnect/
+  backend/
+    app/
+      main.py          # Punto de entrada FastAPI
+      models.py        # Modelos SQLAlchemy
+      schemas.py       # Esquemas Pydantic
+      database.py      # Conexion a PostgreSQL
+      routers/
+        flights.py     # Endpoint GET /flights
+        routes.py      # Endpoint GET /routes
+        aircraft.py    # Endpoint GET /aircraft
+    requirements.txt
+    Dockerfile
+  frontend/
+    src/
+      App.jsx
+      components/
+        FlightSearch.jsx
+        FlightList.jsx
+    Dockerfile
+  db/
+    init.sql           # Script de inicializacion y seed de datos
+  docker-compose.yml
+  locust/
+    locustfile.py      # Script base de pruebas de carga
+\end{lstlisting}
+
+\subsection{Levantar el sistema base}
+
+\begin{lstlisting}[language=bash, caption={Comandos para levantar el entorno}]
+# Clonar el repositorio del sistema base
+git clone <url-repositorio-base>
+cd skyconnect
+
+# Levantar todos los servicios
+docker compose up --build
+
+# Verificar que los servicios estan activos
+docker compose ps
+
+# Acceder a la aplicacion
+# Frontend:  http://localhost:3000
+# Backend:   http://localhost:8000
+# API Docs:  http://localhost:8000/docs
+\end{lstlisting}
+
+\subsection{Arquitectura inicial}
+
+\begin{verbatim}
++---------------+         HTTP          +---------------+
+|               |  ------------------>  |               |
+|    React      |                       |    FastAPI    |
+|  (Frontend)   |  <------------------  |   (Backend)   |
+|               |       JSON            |               |
++---------------+                       +-------+-------+
+                                                |
+                                         SQL queries
+                                                |
+                                        +-------v-------+
+                                        |               |
+                                        |  PostgreSQL   |
+                                        |               |
+                                        +---------------+
+\end{verbatim}
+
+\begin{warningbox}[Problema observable]
+Cada request al endpoint \texttt{GET /flights} ejecuta múltiples \texttt{JOIN} sobre PostgreSQL, incluyendo cálculo dinámico de asientos disponibles. Con alta concurrencia, la base de datos se convierte en el cuello de botella principal, degradando el tiempo de respuesta significativamente.
+\end{warningbox}
+
+\subsection{Arquitectura objetivo (referencia)}
+
+La siguiente arquitectura es una \textit{referencia orientativa}. Cada equipo puede proponer variaciones fundamentadas.
+
+\begin{verbatim}
++---------------+         HTTP          +---------------+
+|    React      | ===================> |    FastAPI    |
+|  (Frontend)   | <================= |   (Backend)   |
++---------------+                       +---+---+---+--+
+                                            |   |   |
+                              Cache MISS    |   |   | Cache HIT
+                                            v   |   v
+                                      +-----+   | +------+
+                                      | PostgreSQL| Redis |
+                                      |         | |      |
+                                      +---------+ +------+
+                                                       ^
+                                             Prometheus scrape
+                                                       |
+                                                 +-----+------+
+                                                 |   Grafana  |
+                                                 +------------+
+\end{verbatim}
+
+% ------------------------------------------------
+\section{Descripción del Dominio de Negocio}
+% ------------------------------------------------
+
+\subsection{Aeronaves disponibles}
+
+\begin{center}
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Modelo} & \textbf{Capacidad (pasajeros)} & \textbf{Operación} \\
+\hline
+Airbus A320       & 180 & Nacional \\
+Boeing 737-800    & 189 & Nacional e internacional \\
+Boeing 787 Dreamliner & 296 & Internacional \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Rutas}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Rutas nacionales} & \textbf{Rutas internacionales} \\
+\hline
+Santiago -- Antofagasta  & Santiago -- Buenos Aires \\
+Santiago -- Concepción   & Santiago -- Lima \\
+Santiago -- Puerto Montt & Santiago -- São Paulo \\
+Santiago -- Punta Arenas & Santiago -- Miami \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Datos precargados (seed)}
+
+El script \texttt{db/init.sql} pobla la base de datos con:
+
+\begin{itemize}
+  \item \textbf{3} registros de aeronaves.
+  \item \textbf{8} rutas (4 nacionales + 4 internacionales).
+  \item \textbf{200} vuelos programados con fechas de salida, precios y estado de ocupación.
+  \item \textbf{500} reservas existentes distribuidas entre los vuelos.
+\end{itemize}
+
+% ------------------------------------------------
+\section{Problema de Negocio}
+% ------------------------------------------------
+
+Durante un evento Cyber Day, miles de usuarios acceden simultáneamente al sistema para buscar vuelos y comprar tickets.
+
+El endpoint crítico es:
+
+\begin{lstlisting}[language=bash]
+GET /flights
+\end{lstlisting}
+
+Este endpoint ejecuta la siguiente consulta (simplificada):
+
+\begin{lstlisting}[language=sql, caption={Consulta del endpoint /flights (versión base)}]
+SELECT
+    f.id,
+    f.departure_date,
+    f.price,
+    r.origin,
+    r.destination,
+    a.model AS aircraft,
+    a.capacity,
+    (a.capacity - COUNT(b.id)) AS available_seats
+FROM flights f
+JOIN routes r ON f.route_id = r.id
+JOIN aircraft a ON f.aircraft_id = a.id
+LEFT JOIN bookings b ON b.flight_id = f.id
+GROUP BY f.id, r.id, a.id
+ORDER BY f.departure_date;
+\end{lstlisting}
+
+\begin{infobox}[¿Por qué esto es un problema?]
+Bajo 1.000 usuarios concurrentes, esta consulta se ejecuta centenares de veces por segundo. PostgreSQL no puede escalar linealmente con ese volumen de lecturas idénticas, generando aumento de latencia, timeouts y eventual indisponibilidad del servicio.
+\end{infobox}
+
+% ------------------------------------------------
+\section{Simulación de Alta Concurrencia}
+% ------------------------------------------------
+
+El repositorio incluye un script base de Locust listo para ejecutar.
+
+\subsection{Script base (referencia)}
+
+\begin{lstlisting}[language=python, caption={locust/locustfile.py --- script base entregado}]
+from locust import HttpUser, task, between
+
+class SkyConnectUser(HttpUser):
+    wait_time = between(1, 3)
+
+    @task(5)
+    def search_flights(self):
+        self.client.get("/flights")
+
+    @task(2)
+    def get_routes(self):
+        self.client.get("/routes")
+
+    @task(1)
+    def get_aircraft(self):
+        self.client.get("/aircraft")
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Ejecutar prueba de carga}]
+# Iniciar Locust (interfaz web en http://localhost:8089)
+docker compose run --rm locust \
+  locust -f locustfile.py \
+  --host=http://backend:8000 \
+  --users 1000 \
+  --spawn-rate 50 \
+  --run-time 5m \
+  --headless \
+  --csv=results/before
+\end{lstlisting}
+
+\subsection{Requisitos mínimos de las pruebas}
+
+\begin{itemize}
+  \item \textbf{Usuarios concurrentes:} mínimo 1.000.
+  \item \textbf{Duración:} mínimo 5 minutos por ejecución.
+  \item \textbf{Escenarios:} al menos dos ejecuciones comparativas (antes y después de optimizar).
+  \item \textbf{Exportación:} resultados exportados en CSV y capturas de Grafana.
+\end{itemize}
+
+% ------------------------------------------------
+\section{Requerimientos Obligatorios}
+% ------------------------------------------------
+
+\subsection{Implementación de Redis}
+
+Cada equipo deberá integrar Redis como capa de caché entre FastAPI y PostgreSQL. La implementación debe considerar:
+
+\begin{itemize}
+  \item \textbf{Cache de vuelos} (\texttt{GET /flights}): resultado completo con TTL apropiado.
+  \item \textbf{Cache de rutas} (\texttt{GET /routes}): datos relativamente estáticos.
+  \item \textbf{Cache de aeronaves} (\texttt{GET /aircraft}): catálogo sin cambios frecuentes.
+  \item \textbf{Estrategia de invalidación}: definir y documentar cuándo y cómo se invalida cada clave.
+\end{itemize}
+
+\begin{infobox}[Guía de implementación Redis]
+\begin{enumerate}
+  \item Agregar el servicio \texttt{redis} al \texttt{docker-compose.yml}.
+  \item Instalar \texttt{redis-py} (o \texttt{aioredis}) en el backend.
+  \item En cada endpoint, verificar primero la clave en Redis; si existe (\textit{cache hit}), retornar el valor; si no (\textit{cache miss}), consultar PostgreSQL, almacenar en Redis y retornar.
+  \item Definir un TTL adecuado según la volatilidad del dato (p.\,ej., 60 segundos para vuelos, 300 para rutas).
+  \item Exponer una métrica \texttt{cache\_hits\_total} y \texttt{cache\_misses\_total} para Prometheus.
+\end{enumerate}
+\end{infobox}
+
+\subsection{Observabilidad}
+
+Es obligatorio implementar Prometheus y Grafana. Los dashboards deben mostrar \textbf{como mínimo}:
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Métrica}              & \textbf{Descripción} \\
+\hline
+Tiempo promedio de respuesta  & Latencia media del endpoint \texttt{/flights} \\
+Latencia P95                  & Percentil 95 de tiempos de respuesta \\
+Requests por segundo (RPS)    & Throughput total del sistema \\
+Uso de CPU                    & Por contenedor (backend, db, redis) \\
+Uso de memoria                & Por contenedor \\
+Cache Hit Ratio               & \texttt{hits / (hits + misses)} \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[language=bash, caption={Acceso a los servicios de observabilidad}]
+# Prometheus:  http://localhost:9090
+# Grafana:     http://localhost:3001  (admin / admin)
+\end{lstlisting}
+
+% ------------------------------------------------
+\section{Mejoras Opcionales}
+% ------------------------------------------------
+
+Los equipos que implementen mejoras adicionales podrán alcanzar la categoría \textbf{Sobresaliente} en los criterios correspondientes. Se sugieren (pero no se limitan a):
+
+\begin{itemize}
+  \item Microservicio de búsqueda de vuelos desarrollado en \textbf{Go} (mayor throughput).
+  \item \textbf{Índices} adicionales en PostgreSQL (p.\,ej., índice compuesto en \texttt{flights(route\_id, departure\_date)}).
+  \item \textbf{Pool de conexiones} con PgBouncer para reducir la presión sobre PostgreSQL.
+  \item \textbf{Balanceo de carga} con Nginx o Traefik para escalar horizontalmente el backend.
+  \item \textbf{Cache de segundo nivel} con estrategia \textit{cache-aside} o \textit{read-through}.
+  \item \textbf{Optimización de consultas SQL}: reescritura de la query con CTEs o vistas materializadas.
+  \item \textbf{Rate limiting} para proteger el sistema ante picos anómalos.
+  \item \textbf{Alertas en Grafana} configuradas con umbrales de SLA (p.\,ej., P95 > 500 ms).
+\end{itemize}
+
+\begin{warningbox}[Importante sobre las mejoras opcionales]
+Cada mejora opcional debe estar respaldada por evidencia cuantitativa (métricas comparativas). No basta con implementar la mejora; es necesario demostrar su impacto con datos.
+\end{warningbox}
+
+% ------------------------------------------------
+\section{Entregables}
+% ------------------------------------------------
+
+\subsection{Repositorio de código}
+
+\begin{itemize}
+  \item Repositorio Git con el código completo y funcional.
+  \item Archivo \texttt{README.md} con instrucciones de despliegue reproducibles.
+  \item \texttt{docker-compose.yml} con todos los servicios (backend, frontend, db, redis, prometheus, grafana, locust).
+  \item Archivos de configuración de Prometheus (\texttt{prometheus.yml}) y dashboards de Grafana exportados en JSON.
+  \item Resultados de las pruebas de carga en \texttt{/results} (CSV y capturas de pantalla).
+\end{itemize}
+
+\subsection{Documento técnico}
+
+El informe debe incluir los siguientes apartados numerados:
+
+\begin{enumerate}
+  \item \textbf{Diagnóstico inicial:} descripción del sistema base y sus limitaciones observadas.
+  \item \textbf{Identificación de cuellos de botella:} evidencia con métricas previas a las optimizaciones.
+  \item \textbf{Arquitectura original:} diagrama y descripción del sistema recibido.
+  \item \textbf{Arquitectura optimizada:} diagrama y justificación de cada componente añadido.
+  \item \textbf{Mejoras implementadas:} detalle técnico de cada optimización (qué, cómo, por qué).
+  \item \textbf{Métricas comparativas:} tablas y gráficas antes/después para cada mejora.
+  \item \textbf{Justificación económica:} estimación de costos de infraestructura y beneficios obtenidos.
+  \item \textbf{Evaluación esfuerzo vs.\ beneficio:} análisis crítico de qué mejoras aportaron más valor relativo al esfuerzo.
+\end{enumerate}
+
+\subsection{Diagramas requeridos}
+
+\begin{itemize}
+  \item Diagrama de casos de uso (flujo del usuario buscando y comprando un vuelo).
+  \item Diagrama de componentes (arquitectura original).
+  \item Diagrama de componentes (arquitectura optimizada).
+  \item Diagrama de flujo de una solicitud \texttt{GET /flights} con Redis (cache hit y cache miss).
+  \item Diagrama de secuencia del proceso de caché (opcional, para Sobresaliente).
+\end{itemize}
+
+\subsection{Presentación oral}
+
+\begin{center}
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Instancia}     & \textbf{Tiempo} \\
+\hline
+Exposición              & 15 minutos \\
+Preguntas del docente  & 5 minutos \\
+\hline
+\textbf{Total}          & \textbf{20 minutos} \\
+\hline
+\end{tabular}
+\end{center}
+
+La presentación debe incluir evidencia en vivo de:
+
+\begin{itemize}
+  \item Sistema corriendo con Docker Compose.
+  \item Dashboards de Grafana con métricas activas.
+  \item Prueba de carga en ejecución (o resultados exportados).
+  \item Comparación antes/después con métricas concretas.
+\end{itemize}
+
+\newpage
+
+% ------------------------------------------------
+\section{Rúbrica de Evaluación}
+% ------------------------------------------------
+
+Cada criterio se evalúa en una escala de \textbf{1 a 4 puntos} según el nivel alcanzado.
+
+\renewcommand{\arraystretch}{1.6}
+\small
+
+\begin{longtable}{|p{2.8cm}|p{2.9cm}|p{2.9cm}|p{2.9cm}|p{2.9cm}|}
+\hline
+\textbf{Criterio} &
+\textbf{Insuficiente (1)} &
+\textbf{Básico (2)} &
+\textbf{Competente (3)} &
+\textbf{Sobresaliente (4)} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Criterio} &
+\textbf{Insuficiente (1)} &
+\textbf{Básico (2)} &
+\textbf{Competente (3)} &
+\textbf{Sobresaliente (4)} \\
+\hline
+\endhead
+
+Diagnóstico del problema &
+No identifica problemas relevantes ni presenta métricas iniciales. &
+Identifica problemas de forma superficial sin evidencia cuantitativa. &
+Identifica correctamente los cuellos de botella y los respalda con métricas. &
+Análisis profundo, métricas objetivas, comparación con estándares de la industria. \\
+\hline
+
+Implementación de Redis &
+No implementa Redis o no funciona en el entorno Docker. &
+Implementación parcial; solo un endpoint usa caché o la invalidación es incorrecta. &
+Redis implementado y funcional con TTL y estrategia de invalidación documentados. &
+Redis optimizado: múltiples estrategias de caché, métricas de hit/miss, análisis de TTL óptimo. \\
+\hline
+
+Observabilidad (Prometheus + Grafana) &
+No existen métricas ni dashboards operativos. &
+Dashboards presentes pero incompletos; faltan métricas críticas. &
+Dashboards funcionales con todas las métricas mínimas requeridas. &
+Observabilidad completa con alertas configuradas, análisis de tendencias y correlación de métricas. \\
+\hline
+
+Pruebas de carga (Locust) &
+No realiza pruebas o no documenta los parámetros utilizados. &
+Pruebas ejecutadas con menos usuarios o tiempo del mínimo requerido. &
+Pruebas correctamente ejecutadas ($\geq$1.000 usuarios, $\geq$5 min) y documentadas. &
+Pruebas rigurosas con múltiples escenarios, análisis estadístico y comparación detallada. \\
+\hline
+
+Métricas comparativas &
+No presenta comparación entre sistema base y sistema optimizado. &
+Comparación parcial o sin datos suficientes para sacar conclusiones. &
+Compara adecuadamente las métricas clave antes y después de cada optimización. &
+Comparación exhaustiva con gráficas, tablas y análisis estadístico por mejora implementada. \\
+\hline
+
+Justificación económica &
+No existe análisis económico. &
+Análisis superficial sin cuantificación de costos ni beneficios. &
+Estimación razonada de costos de infraestructura y ahorro obtenido. &
+Análisis sólido con proyección financiera, cálculo de ROI y comparación de alternativas. \\
+\hline
+
+Esfuerzo vs.\ beneficio &
+No analiza la relación entre el esfuerzo invertido y los resultados. &
+Menciona las mejoras implementadas sin análisis crítico. &
+Analiza adecuadamente qué mejoras fueron más rentables en relación al esfuerzo. &
+Evaluación estratégica con priorización fundamentada y recomendaciones para trabajo futuro. \\
+\hline
+
+Diagramas y documentación &
+Documentación incompleta, inconsistente o sin diagramas. &
+Diagramas básicos presentes pero sin suficiente detalle técnico. &
+Documentación clara, completa y con todos los diagramas requeridos. &
+Documentación de calidad profesional con diagramas detallados y README reproducible. \\
+\hline
+
+Presentación oral &
+No comunica adecuadamente los resultados; no responde preguntas. &
+Presentación parcialmente estructurada; dificultad para responder preguntas técnicas. &
+Presentación clara, técnicamente correcta y con evidencia en vivo. &
+Presentación profesional, dominio total de la solución, respuestas precisas y fundamentadas. \\
+\hline
+
+\end{longtable}
+
+\normalsize
+
+% ------------------------------------------------
+\section{Ponderación}
+% ------------------------------------------------
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Criterio} & \textbf{Peso} & \textbf{Puntos máx.} \\
+\hline
+Diagnóstico del problema        & 10\% & 4 \\
+Implementación de Redis         & 20\% & 4 \\
+Observabilidad y métricas       & 15\% & 4 \\
+Pruebas de carga (Locust)       & 10\% & 4 \\
+Métricas comparativas           & 10\% & 4 \\
+Justificación económica         & 10\% & 4 \\
+Evaluación esfuerzo--beneficio  & 5\%  & 4 \\
+Diagramas y documentación       & 10\% & 4 \\
+Presentación oral               & 10\% & 4 \\
+\hline
+\textbf{Total}                  & \textbf{100\%} & --- \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{0.4cm}
+
+\textbf{Fórmula de la nota:}
+
+\[
+  \text{Nota} = \sum_{i=1}^{9} \left( \frac{\text{Puntos obtenidos}_i}{4} \times \text{Peso}_i \right) \times 6 + 1
+\]
+
+Donde 1 corresponde a la nota mínima y 7 a la nota máxima (escala chilena 1--7).
+
+% ------------------------------------------------
+\section{Criterio de Aprobación}
+% ------------------------------------------------
+
+El hito se considerará aprobado cuando se cumplan \textbf{todos} los siguientes requisitos:
+
+\begin{itemize}
+  \item El sistema corre completamente con \texttt{docker compose up} sin errores manuales.
+  \item Existe una reducción medible y documentada de la latencia en el endpoint \texttt{GET /flights}.
+  \item Redis está efectivamente integrado y el Cache Hit Ratio supera el 70\% durante las pruebas de carga.
+  \item Los dashboards de Grafana muestran métricas en tiempo real durante la presentación.
+  \item Las mejoras están respaldadas por evidencia cuantitativa (CSV de Locust + capturas de Grafana).
+  \item Se presenta una justificación económica con valores estimados fundamentados.
+  \item La documentación y el repositorio son suficientemente claros para que otro equipo reproduzca el entorno.
+\end{itemize}
+
+% ------------------------------------------------
+\section{Consideraciones Éticas y de Integridad Académica}
+% ------------------------------------------------
+
+\begin{itemize}
+  \item Todo el código debe ser desarrollado por el equipo. El uso de herramientas de asistencia de IA (p.\,ej., GitHub Copilot, ChatGPT) está permitido, pero \textbf{debe declararse} en el informe especificando qué partes fueron asistidas y cómo fueron revisadas.
+  \item Los resultados de las pruebas de carga no pueden ser fabricados o editados manualmente.
+  \item Los integrantes del equipo deben ser capaces de explicar cualquier parte del código durante la presentación.
+  \item La detección de plagio o datos fabricados implica calificación inmediata con nota 1 en el hito.
+\end{itemize}
+
+% ------------------------------------------------
+\section{Preguntas Frecuentes}
+% ------------------------------------------------
+
+\begin{description}
+  \item[¿Puedo cambiar el stack del frontend?] No es obligatorio ni recomendado; el foco está en el backend y la capa de caché.
+
+  \item[¿Puedo agregar más endpoints?] Sí, pero los criterios de evaluación se centran en optimizar \texttt{GET /flights}. Otros endpoints son opcionales.
+
+  \item[¿Qué pasa si Redis no mejora la latencia?] Es un resultado válido si está bien documentado y analizado. Lo importante es la rigurosidad del proceso, no solo el resultado positivo.
+
+  \item[¿El TTL de Redis es fijo?] No. El equipo debe justificar el TTL escogido según la volatilidad del dato y el impacto en la consistencia.
+
+  \item[¿Debo implementar autenticación?] No. El sistema base no incluye autenticación y no es requerida para este hito.
+\end{description}
+
+\end{document}

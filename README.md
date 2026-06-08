@@ -20,17 +20,41 @@ docker compose up --build
 | Frontend    | http://localhost:3000        |
 | Backend API | http://localhost:8000        |
 | API Docs    | http://localhost:8000/docs   |
+| Redis       | localhost:6379               |
 | Locust      | http://localhost:8089        |
 | Prometheus  | http://localhost:9090        |
 | Grafana     | http://localhost:3001 (admin/admin) |
 
+## Redis (capa de caché)
+
+Estrategia **cache-aside** en `GET /flights`, `GET /routes` y `GET /aircraft`.
+
+| Endpoint      | Clave Redis                  | TTL   | Justificación                          |
+|---------------|------------------------------|-------|----------------------------------------|
+| GET /flights  | `skyconnect:flights:all`     | 60 s  | Asientos disponibles cambian con reservas |
+| GET /routes   | `skyconnect:routes:all`      | 300 s | Catálogo estático de rutas             |
+| GET /aircraft | `skyconnect:aircraft:all`    | 300 s | Catálogo estático de aeronaves         |
+
+**Invalidación:** las claves expiran por TTL y se refrescan en el próximo cache miss.
+Funciones `invalidate_*_cache()` en `backend/app/cache.py` permiten borrado explícito
+(p. ej. tras confirmar una reserva futura).
+
+**Métricas Prometheus** (expuestas en `/metrics`):
+
+- `cache_hits_total` — respuestas servidas desde Redis
+- `cache_misses_total` — consultas a PostgreSQL
+
+Cache Hit Ratio en Grafana: `hits / (hits + misses)` — objetivo **> 70%** bajo carga.
+
 ## Ejecutar prueba de carga (modo headless)
+
+**Linux / macOS / Git Bash:**
 
 ```bash
 mkdir -p locust/results
 
 docker compose run --rm locust \
-  locust -f locustfile.py \
+  -f locustfile.py \
   --host=http://backend:8000 \
   --users 1000 \
   --spawn-rate 50 \
@@ -39,7 +63,26 @@ docker compose run --rm locust \
   --csv=results/before
 ```
 
-Los resultados quedan en `locust/results/before_stats.csv`.
+**Windows PowerShell** (todo en una línea):
+
+```powershell
+New-Item -ItemType Directory -Force -Path locust\results
+
+docker compose run --rm locust -f locustfile.py --host=http://backend:8000 --users 1000 --spawn-rate 50 --run-time 5m --headless --csv=results/before
+```
+
+> **Nota:** la imagen `locustio/locust` ya usa `locust` como entrypoint. No repitas
+> `locust` en el comando (`docker compose run --rm locust locust ...` falla con
+> `Unknown User(s): locust`).
+
+Los resultados quedan en `locust/results/before_stats.csv` (baseline) o
+`locust/results/after_stats.csv` (post-Redis).
+
+Para la prueba **después** de implementar Redis, cambia el prefijo CSV:
+
+```powershell
+docker compose run --rm locust -f locustfile.py --host=http://backend:8000 --users 1000 --spawn-rate 50 --run-time 5m --headless --csv=results/after
+```
 
 ## Estructura del proyecto
 

@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS bookings (
 CREATE INDEX idx_flights_route    ON flights(route_id);
 CREATE INDEX idx_flights_aircraft ON flights(aircraft_id);
 CREATE INDEX idx_bookings_flight  ON bookings(flight_id);
+-- Índice compuesto para ORDER BY departure_date filtrado por ruta (mejora opcional).
+CREATE INDEX idx_flights_route_departure ON flights(route_id, departure_date);
 
 -- --------------------------------------------------------
 -- AERONAVES (3 modelos)

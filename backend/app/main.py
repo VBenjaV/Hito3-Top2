@@ -1,13 +1,14 @@
 import time
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .cache import ping_redis
+from .cache import is_cache_enabled, ping_redis
 from .database import engine, Base
 from .routers import flights, routes, aircraft
 
@@ -18,9 +19,10 @@ app = FastAPI(
     description=(
         "API de SkyConnect Airlines — Hito 3.\n\n"
         "Capa de caché **Redis** (cache-aside) en `GET /flights`, "
-        "`GET /routes` y `GET /aircraft`. Métricas Prometheus en `/metrics`."
+        "`GET /routes` y `GET /aircraft`. Métricas Prometheus en `/metrics`.\n\n"
+        "Variable `CACHE_ENABLED=false` desactiva la caché para pruebas baseline (before)."
     ),
-    version="2.0.0",
+    version="2.1.0",
 )
 
 app.add_middleware(
@@ -37,18 +39,31 @@ app.include_router(aircraft.router)
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 
+@app.exception_handler(OperationalError)
+async def database_unavailable_handler(_request: Request, exc: OperationalError):
+    """Evita HTTP 500 genéricos cuando PostgreSQL está saturado o no responde."""
+    logger.error("Error de base de datos bajo carga: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Base de datos temporalmente no disponible. Reintentar."},
+    )
+
+
 @app.on_event("startup")
 def startup() -> None:
-    """Espera a PostgreSQL y Redis; crea tablas si no existen."""
+    """Espera a PostgreSQL (y Redis si caché activa); crea tablas si no existen."""
     retries = 10
     for attempt in range(1, retries + 1):
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             Base.metadata.create_all(bind=engine)
-            if not ping_redis():
+            if is_cache_enabled() and not ping_redis():
                 raise RuntimeError("Redis no respondió al ping.")
-            logger.info("Conexión a PostgreSQL y Redis exitosa.")
+            logger.info(
+                "Servicios listos. cache_enabled=%s",
+                is_cache_enabled(),
+            )
             return
         except (OperationalError, RuntimeError) as exc:
             logger.warning("Esperando servicios… intento %d/%d (%s)", attempt, retries, exc)
@@ -58,4 +73,8 @@ def startup() -> None:
 
 @app.get("/health", tags=["health"])
 def health():
-    return {"status": "ok", "redis": ping_redis()}
+    return {
+        "status": "ok",
+        "cache_enabled": is_cache_enabled(),
+        "redis": ping_redis() if is_cache_enabled() else None,
+    }

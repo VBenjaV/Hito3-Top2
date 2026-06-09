@@ -23,6 +23,7 @@ from prometheus_client import Counter
 logger = logging.getLogger("skyconnect")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() in ("1", "true", "yes")
 
 # Claves Redis
 CACHE_KEY_FLIGHTS = "skyconnect:flights:all"
@@ -46,10 +47,20 @@ cache_misses_total = Counter(
 _redis_client: redis.Redis | None = None
 
 
+def is_cache_enabled() -> bool:
+    return CACHE_ENABLED
+
+
 def get_redis() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        _redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            health_check_interval=30,
+        )
     return _redis_client
 
 
@@ -59,6 +70,10 @@ def ping_redis() -> bool:
 
 def get_cached_or_fetch(key: str, ttl: int, fetch_fn: Callable[[], Any]) -> Any:
     """Cache-aside: hit → JSON desde Redis; miss → PostgreSQL → setex."""
+    if not is_cache_enabled():
+        cache_misses_total.inc()
+        return fetch_fn()
+
     client = get_redis()
     cached = client.get(key)
     if cached is not None:

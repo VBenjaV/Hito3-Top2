@@ -46,6 +46,30 @@ Funciones `invalidate_*_cache()` en `backend/app/cache.py` permiten borrado expl
 
 Cache Hit Ratio en Grafana: `hits / (hits + misses)` — objetivo **> 70%** bajo carga.
 
+### Modo baseline (prueba BEFORE — sin caché)
+
+Para reproducir el escenario AS-IS del informe, desactiva Redis en el backend:
+
+```powershell
+docker compose up -d --build
+docker compose stop backend
+docker compose run -d --service-ports --name skyconnect-backend -e CACHE_ENABLED=false backend
+docker compose run --rm locust -f locustfile.py --host=http://backend:8000 --users 1000 --spawn-rate 50 --run-time 5m --headless --csv=results/before
+docker compose rm -sf skyconnect-backend; docker compose up -d backend
+```
+
+Con `CACHE_ENABLED=true` (por defecto en `docker-compose.yml`) se ejecuta la prueba **after**.
+
+### Pool de conexiones PostgreSQL
+
+Variables en `docker-compose.yml` para evitar HTTP 500 por saturación de conexiones:
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `DB_POOL_SIZE` | 20 | Conexiones permanentes en el pool |
+| `DB_MAX_OVERFLOW` | 30 | Conexiones extra bajo pico |
+| `DB_POOL_TIMEOUT` | 30 | Segundos de espera antes de error |
+
 ## Ejecutar prueba de carga (modo headless)
 
 **Linux / macOS / Git Bash:**
